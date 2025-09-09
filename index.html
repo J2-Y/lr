@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>점심 메뉴 뽑기 룰렛</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121924;
+      --panel-2: #0f1520;
+      --text: #e6edf3;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --good: #22c55e;
+      --bad: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; padding: 24px; color: var(--text); background: radial-gradient(1100px 600px at 10% -10%, #122033 0, rgba(18,32,51,0) 30%),
+      radial-gradient(900px 500px at 100% 0%, #0f1b2b 0, rgba(15,27,43,0) 40%), var(--bg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple SD Gothic Neo, "Apple SD 산돌고딕 Neo", "Malgun Gothic", sans-serif;
+    }
+    .app { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; grid-template-columns: 360px 1fr; align-items: start; }
+    h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: -0.2px; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+    .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 14px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+    .card h2 { font-size: 16px; margin: 0 0 10px; color: #cbd5e1; }
+
+    textarea, input[type="number"] {
+      width: 100%; border: 1px solid rgba(148,163,184,.25); background: #0d1320; color: var(--text); padding: 10px 12px; border-radius: 10px; outline: none;
+    }
+    textarea { resize: vertical; min-height: 180px; font-size: 14px; line-height: 1.4; }
+
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    button {
+      appearance: none; border: 1px solid rgba(148,163,184,.25); background: #111827; color: var(--text); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; letter-spacing: .2px; transition: transform .04s ease, background .25s ease, border-color .25s ease;
+    }
+    button:hover { background: #0b1220; }
+    button:active { transform: translateY(1px); }
+    .btn-primary { background: linear-gradient(180deg, #2f7cf4, #1d4ed8); border-color: #1e40af; }
+    .btn-primary:hover { filter: brightness(1.05); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .mini { font-size: 12px; color: var(--muted); }
+
+    /* Wheel */
+    .wheel-wrap { position: relative; display: grid; place-items: center; }
+    .wheel { will-change: transform; width: 440px; height: 440px; border-radius: 50%; border: 10px solid #0b1220; position: relative; box-shadow: inset 0 0 50px rgba(0,0,0,.3), 0 10px 50px rgba(0,0,0,.35); transition: transform cubic-bezier(.17,.89,.32,1.27) 5s; background: conic-gradient(#202938 0deg, #202938 360deg); }
+    .pin { position: absolute; top: -10px; width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 24px solid #f1f5f9; filter: drop-shadow(0 5px 8px rgba(0,0,0,.35)); }
+    .labels { position: absolute; inset: 0; pointer-events: none; }
+    .labels span { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; font-size: 14px; white-space: nowrap; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+
+    .legend { display: grid; gap: 6px; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0,0,0,.35); }
+
+    .result { font-size: 18px; font-weight: 800; margin-top: 8px; }
+    .history { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+    @media (max-width: 980px) { .app { grid-template-columns: 1fr; } .wheel { width: 360px; height: 360px; } }
+  </style>
+</head>
+<body>
+  <h1>점심 메뉴 뽑기 룰렛</h1>
+  <div class="sub">10개 정도의 메뉴를 입력해두고, 그중 5개를 랜덤 후보로 뽑아 룰렛으로 하나를 고릅니다. 입력은 줄바꿈으로 구분해요.</div>
+
+  <div class="app">
+    <section class="card">
+      <h2>메뉴 입력</h2>
+      <textarea id="menuInput" placeholder="한 줄에 하나씩 입력하세요">김치찌개
+제육볶음
+비빔밥
+칼국수
+돈까스
+초밥
+버거
+파스타
+냉면
+순두부찌개</textarea>
+      <div class="grid" style="margin-top:10px; align-items:end;">
+        <div>
+          <div class="mini">룰렛 후보 갯수</div>
+          <input id="pickCount" type="number" min="2" max="10" value="5" />
+        </div>
+        <div class="controls" style="justify-content:flex-end;">
+          <button id="btnPick" class="btn-primary">랜덤으로 후보 5개 뽑기</button>
+          <button id="btnReset">초기화</button>
+        </div>
+      </div>
+      <div id="pickedList" class="legend"></div>
+    </section>
+
+    <section class="card">
+      <h2>룰렛</h2>
+      <div class="wheel-wrap">
+        <div class="pin"></div>
+        <div id="wheel" class="wheel">
+			<div id="labels" class="labels"></div>
+		</div>
+      </div>
+      <div class="controls" style="margin-top:12px;">
+        <button id="btnSpin" class="btn-primary" disabled>돌리기</button>
+        <button id="btnSpinAgain" disabled>다시 돌리기</button>
+      </div>
+      <div id="result" class="result"></div>
+      <div id="history" class="history"></div>
+    </section>
+  </div>
+
+  <script>
+    'use strict';
+    // ==== Minimal ASCII-Safe JS (no template literals, no fancy unicode) ====
+    function $(sel){ return document.querySelector(sel); }
+    var menuInput = $('#menuInput');
+    var pickCountInput = $('#pickCount');
+    var btnPick = $('#btnPick');
+    var btnReset = $('#btnReset');
+    var wheel = $('#wheel');
+    var labels = $('#labels');
+    var btnSpin = $('#btnSpin');
+    var btnSpinAgain = $('#btnSpinAgain');
+    var pickedList = $('#pickedList');
+    var resultEl = $('#result');
+    var historyEl = $('#history');
+
+    var picked = [];
+    var palette = [];
+    var totalRotation = 0;
+    var historyArr = [];
+
+    function shuffle(arr){
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+
+    function randomPalette(n){
+      var list = [];
+      for (var i=0;i<n;i++){
+        var h = Math.round((360 / n) * i + Math.random() * 8);
+        list.push('hsl(' + h + 'deg ' + (60 + (i % 2) * 10) + '% 50%)');
+      }
+      return list;
+    }
+
+    function buildWheel(items){
+      if(!items || !items.length) return;
+      var n = items.length;
+      palette = randomPalette(n);
+      var stops = [];
+      var step = 360 / n;
+      for (var i=0;i<n;i++){
+        var start = i * step;
+        var end = (i+1) * step;
+        stops.push(palette[i] + ' ' + start + 'deg ' + end + 'deg');
+      }
+      wheel.style.background = 'conic-gradient(' + stops.join(',') + ')';
+
+      labels.innerHTML = '';
+      for (var k=0;k<n;k++){
+        var angle = (k + 0.5) * step - 90;
+        var r = 170;
+        var rad = angle * Math.PI / 180;
+        var x = Math.cos(rad) * r;
+        var y = Math.sin(rad) * r;
+        var span = document.createElement('span');
+        span.appendChild(document.createTextNode(items[k]));
+        span.style.transform = 'translate(-50%, -50%) translate(' + x + 'px, ' + y + 'px) rotate(' + (angle + 90) + 'deg)';
+        span.style.color = '#f8fafc';
+        labels.appendChild(span);
+      }
+    }
+
+    function renderLegend(items){
+      pickedList.innerHTML = '';
+      for (var i=0;i<items.length;i++){
+        var row = document.createElement('div');
+        row.className = 'legend-item';
+        var dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.background = palette[i] || '#334155';
+        var label = document.createElement('span');
+        label.appendChild(document.createTextNode(items[i]));
+        row.appendChild(dot);
+        row.appendChild(label);
+        pickedList.appendChild(row);
+      }
+    }
+
+    function pickCandidates(){
+		var raw = menuInput.value
+		  .replace(/\r/g, '\n')      // CRLF → LF 통일
+		  .split('\n')               // 줄바꿈 기준
+		  .join(',')                 // 줄바꿈을 , 로 합치고
+		  .split(',')                // 쉼표 기준으로 다시 나눔
+		  .map(function(s){ return s.trim(); })
+		  .filter(function(s){ return !!s; });
+      var unique = Array.from(new Set(raw));
+      var k = parseInt(pickCountInput.value || '5', 10);
+      if (isNaN(k) || k < 2) k = 2;
+      if (unique.length && k > unique.length) k = unique.length;
+      var chosen = shuffle(unique).slice(0, k);
+      picked = chosen;
+      totalRotation = 0;
+      buildWheel(picked);
+      renderLegend(picked);
+      btnSpin.disabled = picked.length < 2;
+      btnSpinAgain.disabled = true;
+      resultEl.textContent = '';
+    }
+
+    function spinOnce(){
+      if(!picked.length) return;
+      var n = picked.length;
+      var step = 360 / n;
+      var winner = Math.floor(Math.random() * n);
+      var targetAngle = winner * step + step / 2;
+      var spins = 6 + Math.floor(Math.random() * 3);
+      var final = spins * 360 + (360 - targetAngle);
+      totalRotation += final;
+
+      btnSpin.disabled = true;
+      btnSpinAgain.disabled = true;
+
+      function onEnd(){
+        wheel.removeEventListener('transitionend', onEnd);
+        var name = picked[winner];
+        resultEl.textContent = 'Result: [' + name + ']';
+        historyArr.unshift(name);
+        historyEl.textContent = 'History: ' + historyArr.slice(0,10).join(' -> ');
+        btnSpinAgain.disabled = false;
+      }
+
+      wheel.style.transition = 'transform cubic-bezier(.17,.89,.32,1.27) 5s';
+      wheel.addEventListener('transitionend', onEnd, { once: true });
+      var fallback = setTimeout(function(){ onEnd(); clearTimeout(fallback); }, 5200);
+      requestAnimationFrame(function(){ void wheel.offsetWidth; wheel.style.transform = 'rotate(' + totalRotation + 'deg)'; });
+    }
+
+    function resetAll(){
+      picked = [];
+      pickedList.innerHTML = '';
+      labels.innerHTML = '';
+      wheel.style.background = 'conic-gradient(#202938 0deg, #202938 360deg)';
+      wheel.style.transform = 'rotate(0deg)';
+      totalRotation = 0;
+      resultEl.textContent = '';
+      btnSpin.disabled = true;
+      btnSpinAgain.disabled = true;
+    }
+
+    btnPick.addEventListener('click', pickCandidates);
+    btnReset.addEventListener('click', resetAll);
+    btnSpin.addEventListener('click', spinOnce);
+    btnSpinAgain.addEventListener('click', spinOnce);
+
+    pickCandidates();
+  </script>
+</body>
+</html>
